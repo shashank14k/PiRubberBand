@@ -85,7 +85,7 @@ EngineOptType = Literal["Faster", "Finer"]
 
 def set_finer_engine(window_opt: WindowOptType = "Standard", pitch_opt: PitchOptType = "HighQuality",
                       formant_opt: FormantOptType = "Preserved"):
-    faster = EngineOpt["Faster"]
+    faster = EngineOpt["Finer"]
     faster |= WindowOpt[window_opt]
     faster |= PitchOpt[pitch_opt]
     faster |= FormantOpt[formant_opt]

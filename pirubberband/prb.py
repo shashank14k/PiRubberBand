@@ -26,7 +26,7 @@ class PRubberBand:
 
     @tempo.setter
     def tempo(self, val: float):
-        _rubberband.rubberband_set_tempo_ratio(self.state, val)
+        _rubberband.rubberband_set_time_ratio(self.state, val)
         self._tempo = val
 
     @pitch.setter
