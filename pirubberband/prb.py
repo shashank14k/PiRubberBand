@@ -60,22 +60,63 @@ class PRubberBand:
     def __del__(self):
         _rubberband.rubberband_delete(self.state)
 
-    def process(self, buffer: np.ndarray, last_buffer: int):
-        """
+    def study(self, buffer: np.ndarray):
+        ptr = 0
+        final = False
+        while not final:
+            cur_size = min(self.process_size, buffer.shape[1] - ptr)
+            batch_buffer = buffer[:, ptr:ptr+cur_size]
+            buffer_ptr = (ctypes.POINTER(ctypes.c_float) * self.channels)()
+            for i in range(self.channels):
+                buffer_ptr[i] = batch_buffer[i].ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+            final = ptr + cur_size >= buffer.shape[1]
+            _rubberband.rubberband_study(self.state, buffer_ptr, cur_size, final)
+            ptr += cur_size
 
-        :param buffer: of shape (channel, num_samples) where channel = 1 for mono and 2 for stereo
-        :param last_buffer:
-        :return:
-        """
-        buffer_ptr = (ctypes.POINTER(ctypes.c_float) * self.channels)()
-        for i in range(self.channels):
-            buffer_ptr[i] = buffer[i].ctypes.data_as(ctypes.POINTER(ctypes.c_float))
-        _rubberband.rubberband_study(self.state, buffer_ptr, buffer.shape[1], last_buffer)
-        _rubberband.rubberband_process(self.state, buffer_ptr, buffer.shape[1], last_buffer)
-        av = _rubberband.rubberband_retrieve(self.state, buffer_ptr, buffer.shape[1])
-        while av != 0:
-            av = _rubberband.rubberband_retrieve(self.state, buffer_ptr, buffer.shape[1])
 
+    def process(self, buffer: np.ndarray):
+        ptr = 0
+        final = False
+        tot = 0
+        while not final:
+            cur_size = min(self.process_size, buffer.shape[1] - ptr)
+            batch_buffer = buffer[:, ptr:ptr + cur_size].copy()
+            buffer_ptr = (ctypes.POINTER(ctypes.c_float) * self.channels)()
+            for i in range(self.channels):
+                buffer_ptr[i] = batch_buffer[i].ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+            final = ptr + cur_size >= buffer.shape[1]
+            _rubberband.rubberband_process(self.state, buffer_ptr, cur_size, final)
+            ptr += cur_size
+            while 1:
+                avail = self.available()
+                avail = min(avail, cur_size)
+                if avail <= 0:
+                    break
+                av = _rubberband.rubberband_retrieve(self.state, buffer_ptr, avail)
+                tot += av
+                batch_buffer = batch_buffer[:, :avail]
+                self.out = np.concatenate([self.out, batch_buffer], axis=-1)
+def pitch_shift_audio_file(filepath: os.path, scale: float, save_path: os.path):
+    assert os.path.exists(filepath), "Invalid file-path {}".format(filepath)
+    data, samplerate = sf.read(filepath)
+    data = data.astype(np.float32).T #(channel, samples)
+    options = set_finer_engine()
+    obj = PRubberBand(samplerate, data.shape[0], options, 1.0, 1.0, 1024)
+    obj.pitch = scale
+    obj.study(data)
+    obj.process(data)
+    sf.write(save_path, data.T, samplerate)
+
+def time_stretch_audio_file(filepath: os.path, rate: float, save_path: os.path):
+    assert os.path.exists(filepath), "Invalid file-path {}".format(filepath)
+    data, samplerate = sf.read(filepath)
+    data = data.astype(np.float32).T #(channel, samples)
+    options = set_finer_engine()
+    obj = PRubberBand(samplerate, data.shape[0], options, 1.0, 1.0, 1024)
+    obj.tempo = rate
+    obj.study(data)
+    obj.process(data)
+    sf.write(save_path, obj.out.T, samplerate)
 
 
 
