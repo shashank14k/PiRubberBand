@@ -19,7 +19,7 @@ class PRubberBand:
             self._process_size = self.max_process_size
         else:
             self._process_size = max_process_size
-        self.out = np.zeros((2, 1), dtype=np.float32)
+        self.out = np.zeros((self.channels, 1), dtype=np.float32)
 
     @property
     def tempo(self):
