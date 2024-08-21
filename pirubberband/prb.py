@@ -3,17 +3,17 @@ import os
 from typing import Optional
 import numpy as np
 import soundfile as sf
-from rubberband import _rubberband
+from pirubberband.rubberband import _rubberband
 from options import set_finer_engine
 
 
 class PRubberBand:
-    def __init__(self, sample_rate: int, channels: int, options: int, tempo: float, pitch: float, max_process_size: Optional[float] = None):
+    def __init__(self, sample_rate: int, channels: int, tempo: float, pitch: float, options: Optional[int] = None, max_process_size: Optional[float] = None):
         self.sample_rate = sample_rate
         self.channels = channels
         self._tempo = tempo
         self._pitch = pitch
-        self.options = options
+        self.options = options if options is not None else set_finer_engine()
         self.state = _rubberband.rubberband_new(self.sample_rate, self.channels, self.options, self._tempo, self._pitch)
         if max_process_size is None:
             self._process_size = self.max_process_size
@@ -101,7 +101,7 @@ def pitch_shift_audio_file(filepath: os.path, scale: float, save_path: os.path):
     data, samplerate = sf.read(filepath)
     data = data.astype(np.float32).T #(channel, samples)
     options = set_finer_engine()
-    obj = PRubberBand(samplerate, data.shape[0], options, 1.0, 1.0, 1024)
+    obj = PRubberBand(samplerate, data.shape[0], 1.0, 1.0, options, 1024)
     obj.pitch = scale
     obj.study(data)
     obj.process(data)
@@ -112,7 +112,7 @@ def time_stretch_audio_file(filepath: os.path, rate: float, save_path: os.path):
     data, samplerate = sf.read(filepath)
     data = data.astype(np.float32).T #(channel, samples)
     options = set_finer_engine()
-    obj = PRubberBand(samplerate, data.shape[0], options, 1.0, 1.0, 1024)
+    obj = PRubberBand(samplerate, data.shape[0], 1.0, 1.0, options, 1024)
     obj.tempo = rate
     obj.study(data)
     obj.process(data)
