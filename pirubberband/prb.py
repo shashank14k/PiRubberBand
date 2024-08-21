@@ -105,7 +105,7 @@ def pitch_shift_audio_file(filepath: os.path, scale: float, save_path: os.path):
     obj.pitch = scale
     obj.study(data)
     obj.process(data)
-    sf.write(save_path, data.T, samplerate)
+    sf.write(save_path, obj.out.T, samplerate)
 
 def time_stretch_audio_file(filepath: os.path, rate: float, save_path: os.path):
     assert os.path.exists(filepath), "Invalid file-path {}".format(filepath)
