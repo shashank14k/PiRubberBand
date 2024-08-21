@@ -4,7 +4,7 @@ from typing import Optional
 import numpy as np
 import soundfile as sf
 from pirubberband.rubberband import _rubberband
-from options import set_finer_engine
+from pirubberband.options import set_finer_engine
 
 
 class PRubberBand:
