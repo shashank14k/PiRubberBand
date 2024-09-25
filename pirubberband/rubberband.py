@@ -1,15 +1,32 @@
-import os
-import configparser
 import ctypes
+import sys
+import os
+import logging
 
-config_path = os.path.join(os.path.dirname(__file__), "config.conf")
-config = configparser.ConfigParser()
-config.read(config_path)
-shared_obj_pth = config.get('Rubberband', 'so_file')
+logger = logging.getLogger(__name__)
+def load_rubberband_library():
+# Determine the base directory for the installed package
+    package_dir = os.path.abspath(os.path.dirname(__file__))
+    lib_dir = os.path.join(package_dir, "rubberband_build")
 
-assert os.path.exists(shared_obj_pth), "Failed to locate Rubberband build {}".format(shared_obj_pth)
+    if sys.platform.startswith('win'):
+        # Windows
+        lib_file = os.path.join(lib_dir, 'librubberband-2.dll')
+        win_mode = 0
+    elif sys.platform.startswith('linux'):
+        # Linux
+        lib_file = os.path.join(lib_dir, 'librubberband.so')
+        win_mode = None
+    else:
+        raise RuntimeError(f"Unsupported platform: {sys.platform}")
 
-_rubberband = ctypes.CDLL(shared_obj_pth)
+    if not os.path.exists(lib_file):
+        raise RuntimeError(f"Rubberband library not found at {lib_file}")
+    return str(lib_file), win_mode
+
+# Usage
+shared_obj_pth, w = load_rubberband_library()
+_rubberband = ctypes.CDLL(shared_obj_pth, winmode=w)
 
 # Init state function
 _rubberband.rubberband_new.argtypes = [ctypes.c_uint, ctypes.c_uint, ctypes.c_int, ctypes.c_double, ctypes.c_double]

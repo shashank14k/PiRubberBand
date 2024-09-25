@@ -1,86 +1,83 @@
+from setuptools import setup, find_packages
+from setuptools.command.build_py import build_py
 import os
-import sys
 import subprocess
+import shutil
 import urllib.request
 import tarfile
-import configparser
-import shutil
+import sys
 
-def ensure_setuptools():
-    try:
-        import setuptools
-        print("setuptools is already installed.")
-    except ImportError:
-        print("setuptools not found. Installing...")
+rubberband_version = "3.3.0"
+src_fname = f"rubberband-{rubberband_version}.tar.bz2"
+src_code_link = f"https://breakfastquay.com/files/releases/{src_fname}"
+
+def ensure_build_tools():
+    """Ensure meson and ninja are installed."""
+    for tool in ['meson', 'ninja']:
         try:
-            subprocess.run([sys.executable, '-m', 'pip', 'install', '--upgrade', 'setuptools'], check=True)
-            import setuptools
-            print("setuptools installed successfully.")
-        except subprocess.CalledProcessError:
-            print("Failed to install setuptools. Please install it manually.")
+            subprocess.run([tool, '--version'], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            print(f"{tool} is installed.")
+        except FileNotFoundError:
+            print(f"{tool} not found. Please install it manually.")
             sys.exit(1)
 
-ensure_setuptools()
-from setuptools import setup
-rubberband_version = "3.3.0"
-fname = f"rubberband-{rubberband_version}.tar.bz2"
-rubberband_src_code_link = f"https://breakfastquay.com/files/releases/{fname}"
-cwd = os.path.dirname(__file__)
-
 def download_and_extract_rubberband(dest_folder):
+    """Download and extract the Rubberband source code."""
     os.makedirs(dest_folder, exist_ok=True)
-    # Download the file
-    file_name = os.path.join(dest_folder, rubberband_src_code_link.split('/')[-1])
-    print(f"Downloading {file_name}...")
-    urllib.request.urlretrieve(rubberband_src_code_link, file_name)
-    print("Download complete.")
-
-    # Extract the file
+    file_name = os.path.join(dest_folder, src_fname)
+    if not os.path.exists(file_name):
+        print(f"Downloading {file_name}...")
+        urllib.request.urlretrieve(src_code_link, file_name)
+        print("Download complete.")
+    else:
+        print(f"Source file {file_name} already exists. Skipping download.")
     print(f"Extracting {file_name} to {dest_folder}...")
     with tarfile.open(file_name, 'r:bz2') as tar:
         tar.extractall(path=dest_folder)
     print("Extraction complete.")
 
-def install_rubberband():
-    install_dir = os.path.join(cwd)
-    rubberband_dir = os.path.join(cwd, f"rubberband-{rubberband_version}")
-    build_dir = os.path.join(cwd, "rubberband")
-    download_and_extract_rubberband(install_dir)
+def build_rubberband(package_dir):
+    """Build Rubberband from source."""
+    rubberband_dir = os.path.join(package_dir, f"rubberband-{rubberband_version}")
+    build_dir = os.path.join(package_dir, "rubberband_build")
+
+    download_and_extract_rubberband(package_dir)
     os.makedirs(build_dir, exist_ok=True)
+    ensure_build_tools()
 
     if sys.platform.startswith('linux'):
-        build_command = f"meson setup {rubberband_dir} {build_dir} -Ddefault_library=shared && ninja -C {build_dir}"
+        build_command = f"meson setup {build_dir} {rubberband_dir} -Ddefault_library=shared && ninja -C {build_dir}"
+        subprocess.run(build_command, check=True, shell=True)
+
+    elif sys.platform.startswith('win'):
+        build_command = f"meson setup {build_dir} {rubberband_dir} -Ddefault_library=shared && ninja -C {build_dir}"
+        subprocess.run(build_command, check=True, shell=True)
+
     else:
-        raise NotImplemented("{} not supported".format(sys.platform))
-
-    subprocess.run(build_command, check=True, shell=True)
-    os.chdir(install_dir)
-
-
-    config = configparser.ConfigParser()
-    config['Rubberband'] = {
-        'so_file': os.path.join(build_dir, "librubberband.so")
-    }
-
-    # Write the configuration to the file
-    with open(os.path.join(cwd, "pirubberband", "config.conf"), 'w') as configfile:
-        config.write(configfile)
+        raise NotImplementedError(f"{sys.platform} platform not supported")
+    print("Cleaning up...")
+    # Uncomment these lines if you want to remove build files after installation
     shutil.rmtree(rubberband_dir)
-    os.remove(os.path.join(cwd, fname))
+    os.remove(os.path.join(package_dir, src_fname))
 
+class CustomBuildPy(build_py):
+    """Custom build command to override the default build_py."""
+    def run(self):
+        # Call the original build process
+        package_dir = os.path.join(self.build_lib, 'pirubberband')
+        build_rubberband(package_dir)
+        build_py.run(self)
 
-install_rubberband()
-
-# Define your package setup
 setup(
     name='pirubberband',
     version='0.0.1',
-    description='Python wrapper for rubberband library',
+    description='Python wrapper for Rubberband library',
     author='Shashank',
     author_email='shashank14k@gmail.com',
-    packages=['pirubberband'],
-    install_requires=[
-        "numpy",
-        "soundfile"
-    ],
+    packages=find_packages(),  # Automatically discover all packages and sub-packages
+    install_requires=[],  # Specify dependencies here
+    include_package_data=True,
+    cmdclass={
+        'build_py': CustomBuildPy,
+    },
 )
